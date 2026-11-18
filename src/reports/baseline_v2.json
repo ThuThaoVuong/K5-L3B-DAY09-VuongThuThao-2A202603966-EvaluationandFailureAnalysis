@@ -3,7 +3,7 @@
   "shape": "swarm",
   "manifest": {
     "eval_set": "data/eval/eval_set_v2.jsonl",
-    "eval_set_sha": "5a911d2fcd96",
+    "eval_set_sha": "e446b33be9fb1114837ac3cb2f66f2d57ef2ca5760d260410e5a7539590f8664",
     "items": 29,
     "seeds": [
       11,
