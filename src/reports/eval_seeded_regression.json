@@ -3,7 +3,7 @@
   "shape": "seeded_regression",
   "manifest": {
     "eval_set": "data/eval/eval_set_v1.jsonl",
-    "eval_set_sha": "54f2a5f1125d",
+    "eval_set_sha": "434ad35f8748",
     "items": 14,
     "seeds": [
       11,
