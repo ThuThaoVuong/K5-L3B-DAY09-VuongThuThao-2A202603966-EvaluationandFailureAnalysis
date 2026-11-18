@@ -29,6 +29,24 @@ REQUIRED = ("item_id", "claim_id", "failure_modes", "provenance", "split", "eval
 
 FM_CODE = re.compile(r"FM-\d{2}")
 
+# M1: Mapping matrix_id -> failure_modes
+# FM-01 là kiểm tra bảo mật chung vì tất cả claim đều có secret canary.
+FAILURE_MODES_BY_MATRIX: dict[str, list[str]] = {
+    "T01": ["FM-01"],
+    "T02": ["FM-01", "FM-03"],
+    "T03": ["FM-01"],
+    "T04": ["FM-01"],
+    "T05": ["FM-01", "FM-09"],
+    "T06": ["FM-01", "FM-06"],
+    "T07": ["FM-01", "FM-02"],
+    "T08": ["FM-01", "FM-08"],
+    "T09": ["FM-01"],
+    "T10": ["FM-01"],
+    "T11": ["FM-01", "FM-07"],
+    "T12": ["FM-01"],
+    "T13": ["FM-01", "FM-05"],
+    "T14": ["FM-01", "FM-04", "FM-05"],
+}
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -41,20 +59,36 @@ def sha12(path: Path) -> str:
 def build(source: Path = SOURCE) -> tuple[int, int]:
     claims = load_jsonl(source)
     items, labels = [], {}
+    
     for n, claim in enumerate(claims, start=1):
         item_id = f"E-{n:03d}"
+
+        matrix_id = claim.get("matrix_id")
+        failure_modes = FAILURE_MODES_BY_MATRIX.get(matrix_id)
+
+        if not failure_modes:
+            raise ValueError(
+                f"No M1 failure-mode mapping for claim {claim['claim_id']} "
+                f"(matrix_id={matrix_id!r}); update FAILURE_MODES_BY_MATRIX."
+            )
+
         items.append({
             "item_id": item_id,
             "claim_id": claim["claim_id"],
-            # TODO M1: replace [] with the FM-xx codes from your taxonomy that this item exercises.
-            "failure_modes": [],
-            "provenance": {"source": "lab8_public", "matrix_id": claim.get("matrix_id"),
-                           "from_trace": None, "generator": None,
-                           "label_by": "lab8_matrix", "checked_by": None},
+            "failure_modes": failure_modes.copy(),
+            "provenance": {
+                "source": "lab8_public",
+                "matrix_id": matrix_id,
+                "from_trace": None,
+                "generator": None,
+                "label_by": "lab8_matrix",
+                "checked_by": None
+            },
             "split": "regression",
             "eval_set_version": VERSION,
         })
         labels[claim["claim_id"]] = claim["expected"]
+
     ITEMS.parent.mkdir(parents=True, exist_ok=True)
     ITEMS.write_text("".join(json.dumps(i, ensure_ascii=False) + "\n" for i in items), encoding="utf-8")
     LABELS.write_text(json.dumps(labels, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -85,22 +119,55 @@ def build_v2(items_v1: Path = ITEMS, labels_v1: Path = LABELS, pack: Path = PACK
     labels = json.loads(labels_v1.read_text(encoding="utf-8"))
     p = json.loads(pack.read_text(encoding="utf-8"))
     items = [{**it, "eval_set_version": "v2", "slices": slices_for(labels[it["claim_id"]], False)} for it in base]
+    
     for claim in p["claims"]:
+        failure_modes = []
+
+        for mechanism in claim["mechanisms"]:
+            fm = mapping.get(mechanism)
+
+            if not fm:
+                raise ValueError(
+                    f"Unmapped mechanism: {mechanism} "
+                    f"in claim {claim['claim_id']}"
+                )
+
+            failure_modes.append(fm)
+
         items.append({
             "item_id": f"E-{claim['claim_id'][2:]}",   # C-105 -> E-105
             "claim_id": claim["claim_id"],
-            "failure_modes": [mapping.get(m) or f"UNMAPPED:{m}" for m in claim["mechanisms"]],
-            "provenance": {"source": "instructor_adversarial", "matrix_id": None, "from_trace": None,
-                           "generator": f"attack:{claim['attack']}", "label_by": "instructor",
-                           "checked_by": "fixed_shape_replay"},
+            "failure_modes": failure_modes,
+            "provenance": {
+                "source": "instructor_adversarial",
+                "matrix_id": None,
+                "from_trace": None,
+                "generator": f"attack:{claim['attack']}",
+                "label_by": "instructor",
+                "checked_by": "fixed_shape_replay",
+            },
             "split": "adversarial",
             "eval_set_version": "v2",
             "slices": slices_for(claim["expected"], True),
         })
+
         labels[claim["claim_id"]] = claim["expected"]
-    ITEMS_V2.write_text("".join(json.dumps(i, ensure_ascii=False) + "\n" for i in items), encoding="utf-8")
-    LABELS_V2.write_text(json.dumps(labels, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    ITEMS_V2.write_text(
+        "".join(
+            json.dumps(i, ensure_ascii=False) + "\n"
+            for i in items
+        ),
+        encoding="utf-8",
+    )
+
+    LABELS_V2.write_text(
+        json.dumps(labels, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
     return len(items), len(labels)
+
 
 
 def check(items_path: Path = ITEMS, labels_path: Path = LABELS) -> list[str]:
