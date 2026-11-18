@@ -119,22 +119,55 @@ def build_v2(items_v1: Path = ITEMS, labels_v1: Path = LABELS, pack: Path = PACK
     labels = json.loads(labels_v1.read_text(encoding="utf-8"))
     p = json.loads(pack.read_text(encoding="utf-8"))
     items = [{**it, "eval_set_version": "v2", "slices": slices_for(labels[it["claim_id"]], False)} for it in base]
+    
     for claim in p["claims"]:
+        failure_modes = []
+
+        for mechanism in claim["mechanisms"]:
+            fm = mapping.get(mechanism)
+
+            if not fm:
+                raise ValueError(
+                    f"Unmapped mechanism: {mechanism} "
+                    f"in claim {claim['claim_id']}"
+                )
+
+            failure_modes.append(fm)
+
         items.append({
             "item_id": f"E-{claim['claim_id'][2:]}",   # C-105 -> E-105
             "claim_id": claim["claim_id"],
-            "failure_modes": [mapping.get(m) or f"UNMAPPED:{m}" for m in claim["mechanisms"]],
-            "provenance": {"source": "instructor_adversarial", "matrix_id": None, "from_trace": None,
-                           "generator": f"attack:{claim['attack']}", "label_by": "instructor",
-                           "checked_by": "fixed_shape_replay"},
+            "failure_modes": failure_modes,
+            "provenance": {
+                "source": "instructor_adversarial",
+                "matrix_id": None,
+                "from_trace": None,
+                "generator": f"attack:{claim['attack']}",
+                "label_by": "instructor",
+                "checked_by": "fixed_shape_replay",
+            },
             "split": "adversarial",
             "eval_set_version": "v2",
             "slices": slices_for(claim["expected"], True),
         })
+
         labels[claim["claim_id"]] = claim["expected"]
-    ITEMS_V2.write_text("".join(json.dumps(i, ensure_ascii=False) + "\n" for i in items), encoding="utf-8")
-    LABELS_V2.write_text(json.dumps(labels, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    ITEMS_V2.write_text(
+        "".join(
+            json.dumps(i, ensure_ascii=False) + "\n"
+            for i in items
+        ),
+        encoding="utf-8",
+    )
+
+    LABELS_V2.write_text(
+        json.dumps(labels, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
     return len(items), len(labels)
+
 
 
 def check(items_path: Path = ITEMS, labels_path: Path = LABELS) -> list[str]:

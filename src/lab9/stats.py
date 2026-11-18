@@ -159,16 +159,49 @@ def paired_bootstrap(
 
 
 
+import math
+
+
 def pass_at_k(n: int, c: int, k: int) -> float:
-    """Probability that AT LEAST ONE of k trials drawn from n (c of them passing) passes.
-    Unbiased estimator (Chen et al. 2021): 1 - C(n-c, k) / C(n, k). Raise ValueError if k > n."""
-    # TODO M6
-    raise NotImplementedError
+    """
+    Probability that at least one of k trials passes.
+
+    Formula:
+        pass@k = 1 - C(n-c, k) / C(n, k)
+    """
+    if n <= 0:
+        raise ValueError("n must be positive")
+
+    if c < 0 or c > n:
+        raise ValueError("c must be between 0 and n")
+
+    if k <= 0 or k > n:
+        raise ValueError("k must be between 1 and n")
+
+    if n - c < k:
+        return 1.0
+
+    return 1.0 - math.comb(n - c, k) / math.comb(n, k)
 
 
 def pass_hat_k(n: int, c: int, k: int) -> float:
-    """pass^k (tau-bench, Yao et al. 2024): probability that ALL k trials drawn from n pass.
-    Unbiased estimator: C(c, k) / C(n, k). Raise ValueError if k > n.
-    pass^k <= pass@1 <= pass@k; a reliable agent keeps pass^k close to pass@1."""
-    # TODO M6
-    raise NotImplementedError
+    """
+    Probability that all k trials pass.
+
+    Formula:
+        pass^k = C(c, k) / C(n, k)
+    """
+    if n <= 0:
+        raise ValueError("n must be positive")
+
+    if c < 0 or c > n:
+        raise ValueError("c must be between 0 and n")
+
+    if k <= 0 or k > n:
+        raise ValueError("k must be between 1 and n")
+
+    if c < k:
+        return 0.0
+
+    return math.comb(c, k) / math.comb(n, k)
+

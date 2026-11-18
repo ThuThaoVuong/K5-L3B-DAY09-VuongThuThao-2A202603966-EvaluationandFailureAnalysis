@@ -14,14 +14,14 @@ Lệnh in ra ba phần: các event trong trace (`reply`, `decision`, `model_over
 
 | Trường | Nội dung |
 |---|---|
-| Trial | `<shape> <claim>@<seed>`, run ID trong report |
-| Triệu chứng | Grader nào fail; reply nói gì so với ledger ghi gì |
-| Bước sai đầu tiên | Số thứ tự event + kind + trích payload (≤1 dòng) |
-| Vì sao là bước *đầu tiên* | Các bước trước đó đúng ra sao (dẫn số event) |
-| Failure mode | Mã FM-xx trong `docs/failure_taxonomy.md` |
-| Đối chứng | Cùng claim@seed trên shape `fixed`: bước đó khác thế nào |
-| Regression test | Tên test + grader/assert nào bắt được; đã thấy fail trên variant lỗi và pass trên `fixed` chưa |
-| Chưa chắc chắn | Điều trace không chứng minh được |
+| Trial | `seeded_regression C-002@11`, run ID trong report |
+| Triệu chứng | Lab 8 grader FAIL (status resolved != denied). Ledger ghi hoàn 20.000đ, hoàn 1 lần, trạng thái resolved, trong khi nhãn chuẩn yêu cầu hoàn 0đ, 0 lần và denied. Reply thông báo đã hoàn 20.000đ cho đơn O-202. |
+| Bước sai đầu tiên | Event 3 – model_override: {"delay_days": 5} |
+| Vì sao là bước *đầu tiên* |Event 1 (handoff) thiết lập phạm vi xử lý và các công cụ được phép sử dụng. Event 2 (investigator) tra cứu đơn hàng thành công. Event 3 xuất hiện dữ liệu override delay_days=5, làm thay đổi dữ kiện dùng để xét điều kiện chính sách. Event 4 mới tính khoản hoàn 20.000đ dựa trên dữ kiện sai này.|
+| Failure mode | Mã FM-03 – ticket_trust trong `docs/failure_taxonomy.md` |
+| Đối chứng | Với `fixed C-002@11`, event 3 model_override không còn xuất hiện. Event 3 lúc này là quote, kết quả amount_vnd=0, reason=no_entitlement. Ledger ghi hoàn 0đ, 0 lần, trạng thái denied; grader PASS. |
+| Regression test |Có tests/test_swarm_reference.py, kiểm tra C-002 với seed 11 và 55. Tuy nhiên, test này kiểm tra reference swarm, không thể khẳng định nó trực tiếp tái hiện lỗi seeded_regression  |
+| Chưa chắc chắn | Trace chứng minh override xuất hiện trước khi tính khoản hoàn tiền và kết quả ledger sai so với nhãn. Tuy nhiên, trace chưa chứng minh nguyên nhân nội bộ khiến model tạo ra override này. |
 
 ## Quy tắc
 
