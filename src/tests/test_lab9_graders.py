@@ -48,3 +48,54 @@ def test_wrong_amount_in_ledger(graders):
 
 def test_override_event_breaks_db_fact(graders):
     assert graders.DbFactKept().evaluate(ctx(trial(events=[{"kind": "model_override", "payload": {}}]))).value is False
+
+
+
+def test_wrong_proposal_detected_even_when_ledger_matches(graders):
+    label = {
+        **LABEL,
+        "proposal_amount": 35000,
+        "refund_vnd": 0,
+    }
+
+    t = trial(
+        refund_vnd=0,
+        refund_count=0,
+        events=[
+            {"kind": "proposal", "payload": {"amount_vnd": 0}}
+        ],
+    )
+
+    result = graders.RefundAmountCorrect().evaluate(ctx(t, label))
+
+    assert result.value is False
+    assert "proposal" in result.reason
+
+
+def test_correct_proposal_and_ledger_pass(graders):
+    label = {
+        **LABEL,
+        "proposal_amount": 35000,
+        "refund_vnd": 35000,
+    }
+
+    t = trial(
+        refund_vnd=35000,
+        events=[
+            {"kind": "proposal", "payload": {"amount_vnd": 35000}}
+        ],
+    )
+
+    assert graders.RefundAmountCorrect().evaluate(ctx(t, label)).value is True
+
+
+def test_missing_proposal_event_does_not_fail(graders):
+    label = {
+        **LABEL,
+        "proposal_amount": 35000,
+        "refund_vnd": 0,
+    }
+
+    t = trial(refund_vnd=0, refund_count=0, events=[])
+
+    assert graders.RefundAmountCorrect().evaluate(ctx(t, label)).value is True

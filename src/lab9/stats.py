@@ -102,13 +102,61 @@ def rogan_gladen(
     return max(0.0, min(1.0, corrected))
 
 
-def paired_bootstrap(a: Sequence[float], b: Sequence[float], *, n_resamples: int = 1000,
-                     rng: int = 2027, confidence: float = 0.95) -> tuple[float, float, float]:
-    """a[i], b[i] = per-item mean over seeds, SAME items, SAME order.
-    Return (mean(a)-mean(b), lo, hi) with scipy.stats.bootstrap(paired=True, method="percentile",
-    rng=numpy.random.default_rng(rng)). If a == b everywhere return (0.0, 0.0, 0.0)."""
-    # TODO M4
-    raise NotImplementedError
+
+def paired_bootstrap(
+    a: Sequence[float],
+    b: Sequence[float],
+    *,
+    n_resamples: int = 1000,
+    rng: int = 2027,
+    confidence: float = 0.95
+) -> tuple[float, float, float]:
+    """Paired percentile bootstrap for the mean difference a - b."""
+
+    import numpy as np
+    from scipy.stats import bootstrap
+
+    if len(a) != len(b):
+        raise ValueError("a and b must have the same length")
+
+    if len(a) == 0:
+        raise ValueError("a and b must not be empty")
+
+    if n_resamples <= 0:
+        raise ValueError("n_resamples must be positive")
+
+    if not 0 < confidence < 1:
+        raise ValueError("confidence must be between 0 and 1")
+
+    a = np.asarray(a, dtype=float)
+    b = np.asarray(b, dtype=float)
+
+    if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
+        raise ValueError("a and b must contain finite values")
+
+    if np.array_equal(a, b):
+        return (0.0, 0.0, 0.0)
+
+    def statistic(x, y):
+        return np.mean(x - y)
+
+    result = bootstrap(
+        (a, b),
+        statistic,
+        paired=True,
+        vectorized=False,
+        n_resamples=n_resamples,
+        confidence_level=confidence,
+        method="percentile",
+        rng=np.random.default_rng(rng),
+    )
+
+    difference = float(np.mean(a) - np.mean(b))
+    lower = float(result.confidence_interval.low)
+    upper = float(result.confidence_interval.high)
+
+    return difference, lower, upper
+
 
 
 def pass_at_k(n: int, c: int, k: int) -> float:
