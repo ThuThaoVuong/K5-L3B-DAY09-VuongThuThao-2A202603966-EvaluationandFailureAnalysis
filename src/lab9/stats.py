@@ -11,29 +11,95 @@ from collections.abc import Sequence
 
 POS = "FAIL"   # the judge's job is to FIND failures, so FAIL is the positive class
 
-
 def confusion(human: Sequence[str], judge: Sequence[str]) -> dict[str, int]:
     """tp/fp/fn/tn with FAIL as positive."""
-    # TODO M2
-    raise NotImplementedError
+    if len(human) != len(judge):
+        raise ValueError("human and judge must have the same length")
+
+    tp = fp = fn = tn = 0
+
+    for h, j in zip(human, judge):
+        h = h.strip().upper()
+        j = j.strip().upper()
+
+        if h not in {"PASS", "FAIL"} or j not in {"PASS", "FAIL"}:
+            raise ValueError("labels must be PASS or FAIL")
+
+        if h == POS and j == POS:
+            tp += 1
+        elif h != POS and j == POS:
+            fp += 1
+        elif h == POS and j != POS:
+            fn += 1
+        else:
+            tn += 1
+
+    return {"tp": tp, "fp": fp, "fn": fn, "tn": tn}
 
 
-def precision_recall(human: Sequence[str], judge: Sequence[str]) -> tuple[float, float]:
-    # TODO M2: precision = tp/(tp+fp), recall = tp/(tp+fn); return 0.0 when the denominator is 0
-    raise NotImplementedError
+def precision_recall(
+    human: Sequence[str], judge: Sequence[str]
+) -> tuple[float, float]:
+    """Precision = tp/(tp+fp), recall = tp/(tp+fn)."""
+    cm = confusion(human, judge)
+
+    tp = cm["tp"]
+    fp = cm["fp"]
+    fn = cm["fn"]
+
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+
+    return precision, recall
 
 
 def cohen_kappa(human: Sequence[str], judge: Sequence[str]) -> float:
-    """kappa = (p_o - p_e) / (1 - p_e). Raise ValueError when undefined (p_e == 1):
-    a constant judge has no signal and must FAIL calibration, not pass on a technicality."""
-    # TODO M2
-    raise NotImplementedError
+    """Cohen's kappa; raise ValueError when expected agreement is 1."""
+    if len(human) != len(judge):
+        raise ValueError("human and judge must have the same length")
+
+    if not human:
+        raise ValueError("labels must not be empty")
+
+    cm = confusion(human, judge)
+    n = len(human)
+
+    # Observed agreement
+    p_o = (cm["tp"] + cm["tn"]) / n
+
+    # Actual and predicted proportions of FAIL
+    actual_fail = (cm["tp"] + cm["fn"]) / n
+    predicted_fail = (cm["tp"] + cm["fp"]) / n
+
+    actual_pass = 1 - actual_fail
+    predicted_pass = 1 - predicted_fail
+
+    # Expected agreement by chance
+    p_e = (
+        actual_fail * predicted_fail
+        + actual_pass * predicted_pass
+    )
+
+    if p_e == 1:
+        raise ValueError("Cohen's kappa is undefined when p_e == 1")
+
+    return (p_o - p_e) / (1 - p_e)
 
 
-def rogan_gladen(observed_rate: float, sensitivity: float, specificity: float) -> float:
-    """Correct an observed failure rate for judge error; clip to [0, 1]."""
-    # TODO M2: (p_obs + spec - 1) / (sens + spec - 1)
-    raise NotImplementedError
+def rogan_gladen(
+    observed_rate: float,
+    sensitivity: float,
+    specificity: float
+) -> float:
+    """Correct observed failure rate for judge error; clip to [0, 1]."""
+    denominator = sensitivity + specificity - 1
+
+    if denominator <= 0:
+        raise ValueError("sensitivity + specificity must be greater than 1")
+
+    corrected = (observed_rate + specificity - 1) / denominator
+
+    return max(0.0, min(1.0, corrected))
 
 
 def paired_bootstrap(a: Sequence[float], b: Sequence[float], *, n_resamples: int = 1000,
